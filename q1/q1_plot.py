@@ -6,12 +6,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
+# 重置matplotlib样式
+plt.style.use('default')
+
 # 设置matplotlib中文字体
 plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 # 设置seaborn中文字体
-sns.set_style("whitegrid")
+sns.set_style("white")
 sns.set_context("notebook", font_scale=1.2)
 plt.rcParams['font.size'] = 12
 
@@ -19,6 +22,13 @@ plt.rcParams['font.size'] = 12
 plt.rcParams['figure.figsize'] = [12, 8]
 plt.rcParams['savefig.dpi'] = 300
 plt.rcParams['savefig.bbox'] = 'tight'
+
+# 强制设置白色背景
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['savefig.facecolor'] = 'white'
+plt.rcParams['axes.edgecolor'] = 'black'
+plt.rcParams['axes.linewidth'] = 1.0
 
 def solve_problem_1_fixed_priority():
     """
@@ -172,9 +182,14 @@ def solve_problem_1_fixed_priority():
     def plot_histograms(user_data):
         """绘制用户数据的联合分布图（中间散点图，外围边际直方图）"""
         # 设置图表样式和字体
-        sns.set(style="whitegrid")
+        sns.set(style="white")
         plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
         plt.rcParams['axes.unicode_minus'] = False
+        
+        # 强制设置白色背景
+        plt.rcParams['figure.facecolor'] = 'white'
+        plt.rcParams['axes.facecolor'] = 'white'
+        plt.rcParams['savefig.facecolor'] = 'white'
         
         # 高级莫兰迪配色方案
         morandi_colors = {
@@ -188,8 +203,9 @@ def solve_problem_1_fixed_priority():
         large_scale_values = list(user_data['large_scale'].values())
         large_scale_indices = range(len(large_scale_values))
         
-        fig1 = plt.figure(figsize=(8, 6))
+        fig1 = plt.figure(figsize=(8, 6), facecolor='white')
         g1 = sns.JointGrid(x=large_scale_indices, y=large_scale_values, height=6, ratio=3)
+        g1.fig.patch.set_facecolor('white')
         g1.plot_joint(sns.scatterplot, color=morandi_colors['primary'][0], alpha=0.7, s=60)
         g1.plot_marginals(sns.histplot, color=morandi_colors['primary'][0], alpha=0.6, 
                          edgecolor=morandi_colors['accent'][2], linewidth=1)
@@ -197,12 +213,15 @@ def solve_problem_1_fixed_priority():
         g1.ax_joint.set_ylabel('大规模衰减 (dB)', fontsize=12, color=morandi_colors['primary'][0])
         g1.ax_joint.set_title('大规模衰减分布', fontsize=14, fontweight='bold', color=morandi_colors['primary'][0], pad=20)
         g1.ax_joint.grid(True, alpha=0.3, color=morandi_colors['accent'][1])
-        g1.ax_joint.set_facecolor(morandi_colors['neutral'][3])
-        g1.fig.patch.set_facecolor(morandi_colors['neutral'][2])
+        g1.ax_joint.set_facecolor('white')
+        g1.fig.patch.set_facecolor('white')
+        # 设置边际直方图的背景色
+        g1.ax_marg_x.set_facecolor('white')
+        g1.ax_marg_y.set_facecolor('white')
         
         # 保存第一个图
         save_path1 = '/Users/a/Documents/Projects/web_question/q1/large_scale_joint_plot.png'
-        g1.fig.savefig(save_path1, dpi=300, bbox_inches='tight', facecolor=morandi_colors['neutral'][2])
+        g1.fig.savefig(save_path1, dpi=300, bbox_inches='tight', facecolor='white')
         print(f"大规模衰减联合分布图已保存到: {save_path1}")
         plt.close(fig1)
         
@@ -210,8 +229,9 @@ def solve_problem_1_fixed_priority():
         small_scale_values = list(user_data['small_scale'].values())
         small_scale_indices = range(len(small_scale_values))
         
-        fig2 = plt.figure(figsize=(8, 6))
+        fig2 = plt.figure(figsize=(8, 6), facecolor='white')
         g2 = sns.JointGrid(x=small_scale_indices, y=small_scale_values, height=6, ratio=3)
+        g2.fig.patch.set_facecolor('white')
         g2.plot_joint(sns.scatterplot, color=morandi_colors['secondary'][0], alpha=0.7, s=60)
         g2.plot_marginals(sns.histplot, color=morandi_colors['secondary'][0], alpha=0.6,
                          edgecolor=morandi_colors['accent'][2], linewidth=1)
@@ -219,12 +239,15 @@ def solve_problem_1_fixed_priority():
         g2.ax_joint.set_ylabel('小规模瑞丽衰减', fontsize=12, color=morandi_colors['primary'][0])
         g2.ax_joint.set_title('小规模瑞丽衰减分布', fontsize=14, fontweight='bold', color=morandi_colors['primary'][0], pad=20)
         g2.ax_joint.grid(True, alpha=0.3, color=morandi_colors['accent'][1])
-        g2.ax_joint.set_facecolor(morandi_colors['neutral'][3])
-        g2.fig.patch.set_facecolor(morandi_colors['neutral'][2])
+        g2.ax_joint.set_facecolor('white')
+        g2.fig.patch.set_facecolor('white')
+        # 设置边际直方图的背景色
+        g2.ax_marg_x.set_facecolor('white')
+        g2.ax_marg_y.set_facecolor('white')
         
         # 保存第二个图
         save_path2 = '/Users/a/Documents/Projects/web_question/q1/small_scale_joint_plot.png'
-        g2.fig.savefig(save_path2, dpi=300, bbox_inches='tight', facecolor=morandi_colors['neutral'][2])
+        g2.fig.savefig(save_path2, dpi=300, bbox_inches='tight', facecolor='white')
         print(f"小规模瑞丽衰减联合分布图已保存到: {save_path2}")
         plt.close(fig2)
         
@@ -232,8 +255,9 @@ def solve_problem_1_fixed_priority():
         task_flow_values = list(user_data['task_flow'].values())
         task_flow_indices = range(len(task_flow_values))
         
-        fig3 = plt.figure(figsize=(8, 6))
+        fig3 = plt.figure(figsize=(8, 6), facecolor='white')
         g3 = sns.JointGrid(x=task_flow_indices, y=task_flow_values, height=6, ratio=3)
+        g3.fig.patch.set_facecolor('white')
         g3.plot_joint(sns.scatterplot, color=morandi_colors['accent'][0], alpha=0.7, s=60)
         g3.plot_marginals(sns.histplot, color=morandi_colors['accent'][0], alpha=0.6,
                          edgecolor=morandi_colors['accent'][2], linewidth=1)
@@ -241,12 +265,15 @@ def solve_problem_1_fixed_priority():
         g3.ax_joint.set_ylabel('任务流 (Mbit)', fontsize=12, color=morandi_colors['primary'][0])
         g3.ax_joint.set_title('任务流分布', fontsize=14, fontweight='bold', color=morandi_colors['primary'][0], pad=20)
         g3.ax_joint.grid(True, alpha=0.3, color=morandi_colors['accent'][1])
-        g3.ax_joint.set_facecolor(morandi_colors['neutral'][3])
-        g3.fig.patch.set_facecolor(morandi_colors['neutral'][2])
+        g3.ax_joint.set_facecolor('white')
+        g3.fig.patch.set_facecolor('white')
+        # 设置边际直方图的背景色
+        g3.ax_marg_x.set_facecolor('white')
+        g3.ax_marg_y.set_facecolor('white')
         
         # 保存第三个图
         save_path3 = '/Users/a/Documents/Projects/web_question/q1/task_flow_joint_plot.png'
-        g3.fig.savefig(save_path3, dpi=300, bbox_inches='tight', facecolor=morandi_colors['neutral'][2])
+        g3.fig.savefig(save_path3, dpi=300, bbox_inches='tight', facecolor='white')
         print(f"任务流联合分布图已保存到: {save_path3}")
         plt.close(fig3)
         
@@ -255,8 +282,14 @@ def solve_problem_1_fixed_priority():
     def plot_user_analysis(user_data):
         """绘制用户数据分析图表"""
         # 设置图表样式和字体
+        sns.set(style="white")
         plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
         plt.rcParams['axes.unicode_minus'] = False
+        
+        # 强制设置白色背景
+        plt.rcParams['figure.facecolor'] = 'white'
+        plt.rcParams['axes.facecolor'] = 'white'
+        plt.rcParams['savefig.facecolor'] = 'white'
         
         # 高级莫兰迪配色方案
         morandi_colors = {
@@ -266,8 +299,9 @@ def solve_problem_1_fixed_priority():
             'neutral': ['#F5F5DC', '#FAEBD7', '#FFEFD5', '#FFF8DC']  # 浅色系
         }
         
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12), facecolor='white')
         fig.suptitle('用户数据分析', fontsize=16, fontweight='bold', color=morandi_colors['primary'][0])
+        fig.patch.set_facecolor('white')
         
         # 1. 用户位置散点图
         ax1 = axes[0, 0]
@@ -290,7 +324,7 @@ def solve_problem_1_fixed_priority():
         ax1.set_ylabel('Y坐标 (m)', fontsize=12, color=morandi_colors['primary'][0])
         ax1.set_title('用户位置分布', fontsize=14, fontweight='bold', color=morandi_colors['primary'][0])
         ax1.grid(True, alpha=0.3, color=morandi_colors['accent'][1])
-        ax1.set_facecolor(morandi_colors['neutral'][3])
+        ax1.set_facecolor('white')
         
         # 2. 任务流数据条形图
         ax2 = axes[0, 1]
@@ -309,7 +343,7 @@ def solve_problem_1_fixed_priority():
         ax2.set_xticks(range(len(users)))
         ax2.set_xticklabels(users, rotation=45, ha='right', color=morandi_colors['primary'][0])
         ax2.grid(True, alpha=0.3, color=morandi_colors['accent'][1])
-        ax2.set_facecolor(morandi_colors['neutral'][3])
+        ax2.set_facecolor('white')
         
         # 3. 大规模衰减热力图
         ax3 = axes[1, 0]
@@ -326,7 +360,7 @@ def solve_problem_1_fixed_priority():
         ax3.set_xticklabels(users, rotation=45, ha='right', color=morandi_colors['primary'][0])
         ax3.set_yticks([0, 1])
         ax3.set_yticklabels(['大规模衰减', '小规模瑞丽衰减'], color=morandi_colors['primary'][0])
-        ax3.set_facecolor(morandi_colors['neutral'][3])
+        ax3.set_facecolor('white')
         
         # 添加颜色条
         cbar = plt.colorbar(im, ax=ax3)
@@ -349,13 +383,13 @@ def solve_problem_1_fixed_priority():
             autotext.set_fontweight('bold')
         
         # 设置整体背景色
-        fig.patch.set_facecolor(morandi_colors['neutral'][2])
+        fig.patch.set_facecolor('white')
         
         plt.tight_layout()
         
         # 保存图表到指定目录
         save_path = '/Users/a/Documents/Projects/web_question/q1/user_analysis_chart.png'
-        plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor=morandi_colors['neutral'][2])
+        plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
         print(f"用户数据分析图表已保存到: {save_path}")
         
         plt.show()

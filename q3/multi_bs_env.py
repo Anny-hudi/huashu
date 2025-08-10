@@ -141,6 +141,13 @@ class MultiBSInterferenceEnv:
         # 执行调度与传输，计算奖励
         total_qos = 0.0
         total_tasks = 0
+        
+        # 记录详细信息
+        step_info = {
+            'timeout_counts': {slice_name: 0 for slice_name in self.slice_names},
+            'delays': {slice_name: [] for slice_name in self.slice_names},
+            'completed_tasks': {slice_name: 0 for slice_name in self.slice_names}
+        }
 
         # 预先构造每个 BS 的切片功率，供干扰使用
         slice_powers_dbm = {
@@ -201,6 +208,14 @@ class MultiBSInterferenceEnv:
                     qos = self._calc_qos(slice_name, rate_mbps, total_delay_ms, unit)
                     total_qos += qos
                     total_tasks += 1
+                    
+                    # 记录时延信息
+                    step_info['delays'][slice_name].append(total_delay_ms)
+                    step_info['completed_tasks'][slice_name] += 1
+                    
+                    # 检查是否超时
+                    if total_delay_ms > self.slice_params[slice_name]["delay_sla_ms"]:
+                        step_info['timeout_counts'][slice_name] += 1
 
                     if total_delay_ms <= self.slice_params[slice_name]["delay_sla_ms"]:
                         completed.append(t)
@@ -249,8 +264,11 @@ class MultiBSInterferenceEnv:
                         overdue_penalty -= 0.02 * over
 
         global_reward = base_reward + overdue_penalty
+        
+        # 保存步骤信息供外部访问
+        self.last_step_info = step_info
 
-        return obs, global_reward, done, {"num_tasks": total_tasks}
+        return obs, global_reward, done, step_info
 
     # ============== 工具函数 ==============
     def _row_index_from_decision(self, decision_idx: int) -> int:
