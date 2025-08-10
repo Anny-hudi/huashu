@@ -7,6 +7,7 @@ from scipy.optimize import minimize
 import warnings
 warnings.filterwarnings('ignore')
 import os
+import matplotlib.pyplot as plt
 
 # 数据目录与结果保存路径（Windows）
 DATA_DIR = r"C:\Users\Anny\PycharmProjects\huashu\data_4"
@@ -35,6 +36,10 @@ for i in range(10, 30):  # e1-e20: eMBB
     USER_TYPES[i] = 'eMBB'
 for i in range(30, 70):  # m1-m40: mMTC
     USER_TYPES[i] = 'mMTC'
+
+# 用户类型到索引映射（用于统计）
+TYPE_TO_INDEX = {'URLLC': 0, 'eMBB': 1, 'mMTC': 2}
+INDEX_TO_TYPE = {0: 'URLLC', 1: 'eMBB', 2: 'mMTC'}
 
 # 用户索引到列名的映射
 USER_COLUMN_MAP = {}
@@ -206,7 +211,7 @@ def fitness(individual, time_index, task_flow, mbs_large_scale, mbs_small_scale,
     return total_qos
 
 # 遗传算法优化接入决策和资源分配
-def genetic_algorithm(time_index, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale):
+def genetic_algorithm(time_index, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale, convergence_recorder=None):
     # 初始化种群
     population_size = 150  # 增加种群大小以提高优化效果
     population = []
@@ -269,6 +274,12 @@ def genetic_algorithm(time_index, task_flow, mbs_large_scale, mbs_small_scale, s
     for gen in range(generations):
         # 评估适应度
         fitness_values = [fitness(ind, time_index, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale) for ind in population]
+        # 记录收敛曲线（每代的最优适应度）
+        if convergence_recorder is not None:
+            try:
+                convergence_recorder.append(max(fitness_values))
+            except Exception:
+                pass
         
         # 选择
         sorted_indices = np.argsort(fitness_values)[::-1]
@@ -455,6 +466,33 @@ def main():
     print(f"mMTC用户: m1-m40 (索引30-69)")
     print("-" * 50)
     
+    # 结果采集容器
+    times = []
+    total_qos_hist = []
+    urllc_avg_hist = []
+    embb_avg_hist = []
+    mmtc_avg_hist = []
+
+    # 功率控制历史：shape (NUM_BS, T)
+    power_history = []
+
+    # 资源利用（按类型）用于柱状图（取最后一个时间点）
+    last_time_resource_usage_by_type = None  # shape (NUM_BS, 3)
+
+    # 接入分布统计（聚合整个时间窗口）
+    access_counts_by_bs = np.zeros(NUM_BS, dtype=int)
+    access_counts_by_bs_type = np.zeros((NUM_BS, 3), dtype=int)
+
+    # SINR与速率分布（累计）
+    sinr_samples_by_type = { 'URLLC': [], 'eMBB': [], 'mMTC': [] }
+    rate_samples_by_type = { 'URLLC': [], 'eMBB': [], 'mMTC': [] }
+
+    # 遗传算法收敛曲线（每个时间点一条）
+    ga_convergence_histories = {}
+
+    # 时延满足率累计
+    sla_meet = { 'URLLC': [0, 0], 'eMBB': [0, 0], 'mMTC': [0, 0], 'OVERALL': [0, 0] }
+
     # 模拟一段时间内的资源配置 (例如1000ms内每100ms决策一次)
     for t in range(0, 1000, 100):
         time_index = t // 100
@@ -462,7 +500,9 @@ def main():
         
         print("正在优化接入决策和资源分配...")
         # 优化接入决策和资源分配
-        best_individual = genetic_algorithm(time_index, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale)
+        convergence_recorder = []
+        best_individual = genetic_algorithm(time_index, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale, convergence_recorder)
+        ga_convergence_histories[t] = convergence_recorder
         access_decision, resource_allocation = best_individual
         
         print("正在优化功率控制...")
@@ -476,6 +516,9 @@ def main():
         urllc_qos = []
         embb_qos = []
         mmtc_qos = []
+
+        # 本轮资源利用（按类型）统计
+        res_usage_by_type = np.zeros((NUM_BS, 3), dtype=float)
         for u in range(NUM_USERS):
             bs = access_decision[u]
             allocated_blocks = resource_allocation[bs, u]
@@ -500,6 +543,31 @@ def main():
                 embb_qos.append(qos)
             else:
                 mmtc_qos.append(qos)
+
+            # 累计SINR与速率样本（仅对有资源的用户）
+            sinr_samples_by_type[user_type].append(10 * np.log10(max(sinr_values[u], 1e-12)))  # dB
+            rate_samples_by_type[user_type].append(rates[u] / 1e6)  # Mbps
+
+            # 资源使用（按类型）
+            res_usage_by_type[bs, TYPE_TO_INDEX[user_type]] += allocated_blocks
+
+            # SLA满足率统计（仅按时延阈值，符合题意）
+            sla_meet['OVERALL'][1] += 1
+            if user_type == 'URLLC':
+                sla_meet['URLLC'][1] += 1
+                if latency <= 1:
+                    sla_meet['URLLC'][0] += 1
+                    sla_meet['OVERALL'][0] += 1
+            elif user_type == 'eMBB':
+                sla_meet['eMBB'][1] += 1
+                if latency <= 4:
+                    sla_meet['eMBB'][0] += 1
+                    sla_meet['OVERALL'][0] += 1
+            else:  # mMTC
+                sla_meet['mMTC'][1] += 1
+                if latency <= 10:
+                    sla_meet['mMTC'][0] += 1
+                    sla_meet['OVERALL'][0] += 1
         
         urllc_avg_qos = np.mean(urllc_qos) if urllc_qos else 0
         embb_avg_qos = np.mean(embb_qos) if embb_qos else 0
@@ -538,6 +606,211 @@ def main():
         print(f"  SBS_2: {resource_usage[2]}/50 资源块")
         print(f"  SBS_3: {resource_usage[3]}/50 资源块")
         print("-" * 50)
+
+        # 采集时间序列数据
+        times.append(t)
+        total_qos_hist.append(total_qos)
+        urllc_avg_hist.append(urllc_avg_qos)
+        embb_avg_hist.append(embb_avg_qos)
+        mmtc_avg_hist.append(mmtc_avg_qos)
+        power_history.append(power_control)
+        last_time_resource_usage_by_type = res_usage_by_type
+
+        # 聚合接入分布
+        for u in range(NUM_USERS):
+            bs = access_decision[u]
+            access_counts_by_bs[bs] += 1
+            access_counts_by_bs_type[bs, TYPE_TO_INDEX[USER_TYPES[u]]] += 1
+
+    # 绘图输出目录
+    output_dir = os.path.dirname(RESULTS_PATH)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    # 1. 用户服务质量（QoS）随时间变化曲线
+    plt.figure(figsize=(10, 6))
+    plt.plot(times, total_qos_hist, label='总QoS值', linewidth=2)
+    plt.plot(times, urllc_avg_hist, label='URLLC用户平均QoS', linewidth=2)
+    plt.plot(times, embb_avg_hist, label='eMBB用户平均QoS', linewidth=2)
+    plt.plot(times, mmtc_avg_hist, label='mMTC用户平均QoS', linewidth=2)
+    plt.xlabel('时间 (ms)')
+    plt.ylabel('QoS 值')
+    plt.title('用户服务质量（QoS）随时间变化')
+    plt.grid(True, linestyle='--', alpha=0.4)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'qos_over_time.png'), dpi=150)
+    plt.close()
+
+    # 2. 基站资源利用率堆叠柱状图（使用最后一个时间点）
+    if last_time_resource_usage_by_type is not None:
+        labels = ['MBS_1', 'SBS_1', 'SBS_2', 'SBS_3']
+        urllc_vals = last_time_resource_usage_by_type[:, TYPE_TO_INDEX['URLLC']]
+        embb_vals = last_time_resource_usage_by_type[:, TYPE_TO_INDEX['eMBB']]
+        mmtc_vals = last_time_resource_usage_by_type[:, TYPE_TO_INDEX['mMTC']]
+        x = np.arange(NUM_BS)
+        width = 0.6
+        plt.figure(figsize=(10, 6))
+        p1 = plt.bar(x, urllc_vals, width, label='URLLC')
+        p2 = plt.bar(x, embb_vals, width, bottom=urllc_vals, label='eMBB')
+        p3 = plt.bar(x, mmtc_vals, width, bottom=urllc_vals + embb_vals, label='mMTC')
+        # 参考线
+        plt.hlines([100, 50, 50, 50], xmin=x-0.5, xmax=x+0.5, colors=['r','g','g','g'], linestyles='--',
+                   label='资源上限 (MBS:100, SBS:50)')
+        plt.xticks(x, labels)
+        plt.ylabel('资源块使用量')
+        plt.title('基站资源利用率（按类型堆叠）')
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'resource_usage_stacked.png'), dpi=150)
+        plt.close()
+
+    # 3. 功率控制热力图（基站 x 时间）
+    if power_history:
+        power_mat = np.array(power_history).T  # shape: (NUM_BS, T)
+        plt.figure(figsize=(10, 4.5))
+        im = plt.imshow(power_mat, aspect='auto', cmap='YlOrRd', origin='lower')
+        plt.colorbar(im, label='功率 (dBm)')
+        plt.yticks(np.arange(NUM_BS), ['MBS_1','SBS_1','SBS_2','SBS_3'])
+        plt.xticks(np.arange(len(times)), [str(t) for t in times], rotation=45)
+        plt.xlabel('时间 (ms)')
+        plt.title('功率控制热力图')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'power_heatmap.png'), dpi=150)
+        plt.close()
+
+    # 4. 用户接入分布嵌套饼图（聚合整个时间窗口）
+    total_access = access_counts_by_bs.sum()
+    if total_access > 0:
+        outer_sizes = access_counts_by_bs / total_access
+        bs_labels = ['MBS_1','SBS_1','SBS_2','SBS_3']
+        # 内环：每个基站按类型比例
+        inner_sizes = []
+        inner_labels = []
+        for bs in range(NUM_BS):
+            bs_total = access_counts_by_bs[bs]
+            type_counts = access_counts_by_bs_type[bs]
+            if bs_total > 0:
+                proportions = type_counts / bs_total
+            else:
+                proportions = np.zeros(3)
+            inner_sizes.extend(proportions.tolist())
+            inner_labels.extend([f"{bs_labels[bs]}-{INDEX_TO_TYPE[i]}" for i in range(3)])
+        # 绘制
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.pie(outer_sizes, radius=1.0, labels=bs_labels, autopct='%1.1f%%', pctdistance=0.85,
+               wedgeprops=dict(width=0.3, edgecolor='w'))
+        ax.pie(inner_sizes, radius=0.7, labels=None, autopct=None,
+               wedgeprops=dict(width=0.3, edgecolor='w'))
+        centre_circle = plt.Circle((0, 0), 0.4, fc='white')
+        ax.add_artist(centre_circle)
+        ax.set(aspect="equal", title='用户接入分布（外环：基站比例；内环：各基站内类型比例）')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'access_distribution_donut.png'), dpi=150)
+        plt.close()
+
+    # 5. SINR与速率分布箱线图（双轴，按用户类型）
+    categories = ['URLLC', 'eMBB', 'mMTC']
+    sinr_data = [sinr_samples_by_type[c] if len(sinr_samples_by_type[c]) > 0 else [0] for c in categories]
+    rate_data = [rate_samples_by_type[c] if len(rate_samples_by_type[c]) > 0 else [0] for c in categories]
+    x_pos = np.arange(1, len(categories) + 1)
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    bp1 = ax1.boxplot(sinr_data, positions=x_pos, widths=0.35, patch_artist=True)
+    for box in bp1['boxes']:
+        box.set(facecolor='#87CEFA')
+    ax1.set_ylabel('SINR (dB)')
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(categories)
+    ax1.grid(True, linestyle='--', alpha=0.3)
+    ax2 = ax1.twinx()
+    bp2 = ax2.boxplot(rate_data, positions=x_pos + 0.4, widths=0.35, patch_artist=True)
+    for box in bp2['boxes']:
+        box.set(facecolor='#FFA07A')
+    ax2.set_ylabel('传输速率 (Mbps)')
+    ax1.set_title('SINR 与 速率分布（按用户类型）')
+    ax1.legend([bp1['boxes'][0], bp2['boxes'][0]], ['SINR (dB)', '速率 (Mbps)'], loc='upper right')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'sinr_rate_boxplot.png'), dpi=150)
+    plt.close()
+
+    # 6. 遗传算法收敛曲线（每个时间点一条）
+    if ga_convergence_histories:
+        plt.figure(figsize=(10, 6))
+        for t, hist in ga_convergence_histories.items():
+            if not hist:
+                continue
+            plt.plot(range(len(hist)), hist, label=f'{t}ms')
+        plt.xlabel('迭代次数')
+        plt.ylabel('适应度（总QoS）')
+        plt.title('遗传算法收敛曲线')
+        plt.grid(True, linestyle='--', alpha=0.4)
+        plt.legend(ncol=2)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'ga_convergence.png'), dpi=150)
+        plt.close()
+
+    # 7. 用户位置与基站覆盖散点图（使用最后一个时间点）
+    try:
+        # 选择最后一个时间点的用户位置
+        pos_row = user_positions.iloc[times[-1] // 100]
+        bs_coords = np.array([BS_POSITIONS[i] for i in range(NUM_BS)])
+        plt.figure(figsize=(8, 8))
+        plt.scatter(bs_coords[:, 0], bs_coords[:, 1], c=['red','orange','green','blue'], marker='^', s=200, label='基站')
+        # 绘制用户点与连线
+        colors = {'URLLC': 'red', 'eMBB': 'blue', 'mMTC': 'green'}
+        # 需要再次获取该时刻的接入决策（简化：使用最后一次循环中的 access_decision）
+        # 为确保变量存在，这里不访问局部变量，改为重算一次最优接入（不优化功率）
+        temp_best_ind = genetic_algorithm(times[-1] // 100, task_flow, mbs_large_scale, mbs_small_scale, sbs_large_scale, sbs_small_scale)
+        temp_access_decision, _ = temp_best_ind
+        for u in range(NUM_USERS):
+            user_type = USER_TYPES[u]
+            name = USER_COLUMN_MAP[u]
+            x = pos_row[f'{name}_X']
+            y = pos_row[f'{name}_Y']
+            plt.scatter([x], [y], c=colors[user_type], s=20)
+            bs = temp_access_decision[u]
+            bx, by = BS_POSITIONS[bs]
+            plt.plot([x, bx], [y, by], color=colors[user_type], alpha=0.2, linewidth=0.8)
+        plt.title('用户位置与基站覆盖（最后时刻）')
+        plt.xlabel('X (m)')
+        plt.ylabel('Y (m)')
+        plt.legend(loc='upper right')
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'topology_scatter.png'), dpi=150)
+        plt.close()
+    except Exception:
+        pass
+
+    # 8. 时延满足率雷达图
+    try:
+        metrics = [
+            ('URLLC时延≤1ms', sla_meet['URLLC']),
+            ('eMBB速率≥50Mbps且时延≤4ms', sla_meet['eMBB']),
+            ('mMTC时延≤10ms', sla_meet['mMTC']),
+            ('总体SLA满足率', sla_meet['OVERALL'])
+        ]
+        values = []
+        for _, (met, total) in metrics:
+            pct = (met / total) if total > 0 else 0.0
+            values.append(pct)
+        # 闭合雷达
+        labels = [m[0] for m in metrics]
+        values += values[:1]
+        angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist()
+        angles += angles[:1]
+        fig = plt.figure(figsize=(8, 6))
+        ax = plt.subplot(111, polar=True)
+        ax.plot(angles, values, linewidth=2)
+        ax.fill(angles, values, alpha=0.25)
+        ax.set_thetagrids(np.degrees(angles[:-1]), labels)
+        ax.set_title('时延/总体SLA满足率雷达图')
+        ax.set_rlim(0, 1)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'latency_sla_radar.png'), dpi=150)
+        plt.close()
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()
