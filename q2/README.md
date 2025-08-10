@@ -111,3 +111,98 @@ python q2_hybrid_solution.py
 - 用户位置2.csv
 - 大规模衰减2.csv
 - 小规模瑞丽衰减2.csv
+
+# 混合资源分配算法可视化分析
+
+## 新增绘图功能
+
+本文件新增了6种专业的图表绘制功能，用于全面分析混合资源分配算法的性能：
+
+### 1. 资源分配比例图 (Resource Allocation Chart)
+- **类型**: 堆叠面积图
+- **目的**: 展示三种切片在不同时间点的资源分配比例
+- **输出**: `resource_allocation.png`
+
+### 2. QoS性能对比图 (QoS Comparison Chart)
+- **类型**: 分组柱状图
+- **目的**: 比较三种切片在不同决策时刻的QoS表现
+- **输出**: `qos_comparison.png`
+
+### 3. 决策方法选择热力图 (Decision Method Heatmap)
+- **类型**: 热力图
+- **目的**: 展示混合决策中动态优化和强化学习的选择比例
+- **输出**: `decision_heatmap.png`
+- **依赖**: seaborn库
+
+### 4. 任务队列动态图 (Queue Dynamics Chart)
+- **类型**: 多线折线图
+- **目的**: 展示任务队列长度的实时变化
+- **输出**: `queue_dynamics.png`
+
+### 5. 三维资源分配散点图 (3D Resource Space Chart)
+- **类型**: 3D散点图
+- **目的**: 展示资源分配的决策空间
+- **输出**: `3d_resource_space.png`
+
+### 6. 算法性能对比雷达图 (Performance Radar Chart)
+- **类型**: 雷达图
+- **目的**: 对比不同切片的平均QoS性能
+- **输出**: `radar_chart.png`
+
+## 使用方法
+
+### 自动绘制所有图表
+```python
+# 运行仿真后自动绘制所有图表
+hybrid_optimizer.plot_all_charts(results)
+```
+
+### 单独绘制特定图表
+```python
+# 绘制资源分配比例图
+hybrid_optimizer.plot_resource_allocation(results)
+
+# 绘制QoS性能对比图
+hybrid_optimizer.plot_qos_comparison(results)
+
+# 绘制决策方法选择热力图
+hybrid_optimizer.plot_decision_heatmap(results)
+
+# 绘制任务队列动态图
+hybrid_optimizer.plot_queue_dynamics(results)
+
+# 绘制三维资源分配散点图
+hybrid_optimizer.plot_3d_resource_space(results)
+
+# 绘制算法性能对比雷达图
+hybrid_optimizer.plot_radar_chart(results)
+```
+
+## 依赖库
+
+- numpy: 数值计算
+- pandas: 数据处理
+- matplotlib: 基础绘图
+- scipy: 优化算法
+- seaborn: 高级统计图表 (可选)
+
+## 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+## 注意事项
+
+1. 所有图表都会自动保存到q2目录下
+2. 图片分辨率设置为300 DPI，适合论文使用
+3. 使用专业配色方案，确保图表美观
+4. 支持中文字体显示
+5. 如果seaborn库未安装，热力图功能将被跳过
+
+## 图表特点
+
+- **学术性**: 适合数学建模比赛和学术论文
+- **专业性**: 使用标准的科研图表样式
+- **美观性**: 采用现代设计理念和配色方案
+- **实用性**: 提供全面的算法性能分析视角
